@@ -1,7 +1,5 @@
 
 #ProjectPhoenix
-#RAUNAK SINGH SOI
-#CARLETON UNIVERSITY
 #YEAR 2023
 
 import csv
@@ -88,13 +86,6 @@ def sort_songs_by_sentiment_and_genre():
 
     return sorter_positive, sorter_negative, sorter_neutral
 
-# Example usage:
-positive_songs, negative_songs, neutral_songs = sort_songs_by_sentiment_and_genre()
-
-# Print the sorted lists (you can modify this part to save or display the results)
-print("Positive Songs:", positive_songs)
-print("Negative Songs:", negative_songs)
-print("Neutral Songs:", neutral_songs)
 
                  
            
