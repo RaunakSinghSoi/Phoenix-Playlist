@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PhoenixPlaylist 🎵</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">🔥</span>
+        <h1>PhoenixPlaylist</h1>
+      </div>
+      <div class="auth-area">
+        {% if authenticated %}
+          <span class="badge badge-green">Spotify Connected</span>
+          <a href="/auth/logout" class="btn btn-outline">Logout</a>
+        {% else %}
+          <a href="/auth/spotify" class="btn btn-spotify">Connect Spotify</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="tagline">Recognize songs &middot; Analyze moods &middot; Build playlists automatically</p>
+    </section>
+
+    <!-- Single Track Recognition -->
+    <section class="card" id="recognize-section">
+      <h2>🎵 Recognize &amp; Classify Track</h2>
+      <div class="input-row">
+        <input type="text" id="query-input" placeholder="e.g. Blinding Lights The Weeknd" />
+        <button class="btn btn-primary" onclick="recognizeTrack()">Analyze</button>
+      </div>
+      <div id="recognize-result" class="result-box hidden"></div>
+    </section>
+
+    <!-- Batch Playlist Generation -->
+    <section class="card" id="batch-section">
+      <h2>📋 Generate Mood Playlists</h2>
+      <p class="hint">Enter one song per line (artist + title). We'll sort them by mood automatically.</p>
+      <textarea id="batch-input" rows="6" placeholder="Shape of You Ed Sheeran&#10;Someone Like You Adele&#10;Lose Yourself Eminem&#10;Clair de Lune Debussy"></textarea>
+      <div class="input-row mt-sm">
+        <select id="mood-filter">
+          <option value="">All moods</option>
+          <option value="happy">Happy</option>
+          <option value="sad">Sad</option>
+          <option value="energetic">Energetic</option>
+          <option value="chill">Chill</option>
+        </select>
+        <button class="btn btn-primary" onclick="generatePlaylist()">Generate</button>
+      </div>
+      <div id="batch-result" class="result-box hidden"></div>
+    </section>
+
+    <!-- Mood Boards -->
+    <section id="mood-boards" class="hidden">
+      <h2 class="section-title">Mood Playlists</h2>
+      <div class="mood-grid" id="mood-grid"></div>
+      {% if authenticated %}
+      <div class="push-area">
+        <select id="push-mood">
+          <option value="happy">Happy</option>
+          <option value="sad">Sad</option>
+          <option value="energetic">Energetic</option>
+          <option value="chill">Chill</option>
+        </select>
+        <button class="btn btn-spotify" onclick="pushToSpotify()">Push to Spotify ➔</button>
+      </div>
+      {% else %}
+      <p class="hint center"><a href="/auth/spotify">Connect Spotify</a> to push playlists to your account.</p>
+      {% endif %}
+      <div id="push-result" class="result-box hidden mt-sm"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Built with Flask &middot; Shazam API &middot; Spotify API &middot; VADER NLP &nbsp;|&nbsp; PhoenixPlaylist &copy; 2025</p>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
