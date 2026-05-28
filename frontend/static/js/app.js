@@ -91,12 +91,12 @@ async function recognizeTrack() {
         ${imgTag}
         <div class="track-info">
           <h3>${t.name || query}</h3>
-          <p>${t.artist || ''} &mdash; ${t.album || ''}</p>
-          <p style="font-size:.8rem;color:var(--muted)">BPM: ${bpm} &nbsp;|&nbsp; Energy: ${energy} &nbsp;|&nbsp; Positivity: ${valence}</p>
+          <p>${t.artist || ''}${t.album ? ' &mdash; ' + t.album : ''}</p>
+          <p style="font-size:.8rem;color:var(--muted)">Genre: ${t.genre || 'Unknown'} &nbsp;|&nbsp; Energy: ${energy} &nbsp;|&nbsp; Positivity: ${valence}</p>
           <span class="mood-tag ${moodClass(mood.mood)}">${moodEmoji(mood.mood)} ${mood.label || mood.mood}</span>
           <span style="font-size:.78rem;color:var(--muted);margin-left:.5rem">Confidence: ${Math.round((mood.confidence || 0) * 100)}%</span>
           ${previewBtn}
-          ${t.external_url ? `<br><a href="${t.external_url}" target="_blank" rel="noopener" style="font-size:.82rem;color:var(--green);margin-top:.4rem;display:inline-block">Open in Spotify</a>` : ''}
+          ${t.external_url ? `<br><a href="${t.external_url}" target="_blank" rel="noopener" style="font-size:.82rem;color:var(--accent);margin-top:.4rem;display:inline-block">Open in iTunes</a>` : ''}
         </div>
       </div>
     `);

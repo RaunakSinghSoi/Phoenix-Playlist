@@ -131,7 +131,7 @@ def save_tracks(playlist_id: int, tracks: list[dict]):
             mood.get("compound_score", 0.0),
             af.get("energy", 0.0),
             af.get("valence", 0.0),
-            "",
+            track.get("genre", ""),
             track.get("album_image", ""),
         ))
     with get_connection() as conn:
