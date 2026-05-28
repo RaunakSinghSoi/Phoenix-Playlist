@@ -1,17 +1,17 @@
 # PhoenixPlaylist
 
-A full-stack web application that recognizes songs, classifies them by mood using natural language processing and genre-based audio profiling, and automatically generates themed Spotify playlists. User history and playlist data are persisted in a local SQLite database.
+A full-stack web application that recognizes songs, classifies them by mood using natural language processing and genre-based audio profiling, and saves the resulting playlists to a local relational database. Built with Python, Flask, and SQL.
 
 ---
 
 ## Features
 
-- Song lookup via the iTunes Search API (no authentication required)
+- Song lookup via the iTunes Search API (no authentication, no API key required)
 - Mood classification combining VADER sentiment analysis on song titles with a genre-derived energy and valence model
 - Auto-generates four mood-based playlist categories: Happy, Sad, Energetic, Chill
-- Spotify OAuth 2.0 integration to push generated playlists directly to a user's account
-- SQLite database tracking users, playlists, and individual tracks across sessions
-- Playlist history dashboard with per-mood statistics
+- Local playlist persistence in a SQLite relational database
+- Per-mood statistics and expandable playlist history with full track-level mood metrics
+- Optional Spotify OAuth 2.0 hook for future playlist export (disabled by default)
 
 ---
 
@@ -20,10 +20,9 @@ A full-stack web application that recognizes songs, classifies them by mood usin
 | Layer | Technology |
 |---|---|
 | Backend | Python 3.11, Flask 3 |
-| Database | SQLite3 with raw SQL |
+| Database | SQL (SQLite3 with raw queries) |
 | NLP | NLTK VADER sentiment analyzer |
-| External APIs | iTunes Search API, Spotify Web API |
-| Auth | Spotify OAuth 2.0 Authorization Code Flow |
+| External API | iTunes Search API |
 | Frontend | HTML, CSS, Vanilla JavaScript |
 
 ---
@@ -35,9 +34,9 @@ PhoenixPlaylist/
 ├── backend/
 │   ├── app.py                  # Flask application and all API routes
 │   ├── config.py               # Environment variable loading
-│   ├── database.py             # SQLite schema, connections, and queries
+│   ├── database.py             # SQL schema, connections, and queries
 │   ├── itunes_client.py        # iTunes Search API wrapper
-│   ├── spotify_client.py       # Spotify API and OAuth wrapper
+│   ├── spotify_client.py       # Optional Spotify OAuth wrapper
 │   └── playlist_manager.py     # Core orchestration logic
 ├── frontend/
 │   ├── templates/index.html
@@ -55,11 +54,41 @@ PhoenixPlaylist/
 
 ## Database Schema
 
-**users**: id, spotify_id, email, display_name, created_at
-**playlists**: id, user_id, playlist_name, mood_category, spotify_uri, spotify_url, track_count, created_at
-**tracks**: id, playlist_id, track_name, artist, spotify_uri, mood_score, energy, valence, genre, album_image_url, created_at
+Three tables linked by foreign keys with cascading deletes and indexes on lookup columns.
 
-Foreign keys cascade on delete. Indexes on user_id, mood_category, and playlist_id for fast lookups.
+**users**
+| Column | Type | Notes |
+|---|---|---|
+| id | INTEGER | Primary key |
+| spotify_id | TEXT | Unique identifier (or local_default) |
+| email | TEXT | |
+| display_name | TEXT | |
+| created_at | TEXT | UTC datetime |
+
+**playlists**
+| Column | Type | Notes |
+|---|---|---|
+| id | INTEGER | Primary key |
+| user_id | INTEGER | FK to users (CASCADE delete) |
+| playlist_name | TEXT | |
+| mood_category | TEXT | happy / sad / energetic / chill |
+| track_count | INTEGER | |
+| created_at | TEXT | UTC datetime |
+
+**tracks**
+| Column | Type | Notes |
+|---|---|---|
+| id | INTEGER | Primary key |
+| playlist_id | INTEGER | FK to playlists (CASCADE delete) |
+| track_name | TEXT | |
+| artist | TEXT | |
+| genre | TEXT | |
+| mood_score | REAL | VADER compound score |
+| energy | REAL | Estimated from genre |
+| valence | REAL | Estimated from genre |
+| album_image_url | TEXT | |
+
+Race-safe inserts use SQL `ON CONFLICT` upserts. Indexes on `user_id`, `mood_category`, and `playlist_id` for fast lookups.
 
 ---
 
@@ -75,22 +104,17 @@ source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Get Spotify credentials (only needed if you want playlist push)
-
-1. Create an app at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)
-2. Add `http://127.0.0.1:5000/callback` as a Redirect URI
-3. Enable Web API under "APIs used"
-4. Copy your Client ID and Client Secret into `.env`
-
-### 3. Run
+### 2. Run
 
 ```bash
-cp .env.example .env
-# Fill in SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET if you want push
 python -m backend.app
 ```
 
-Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
+Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser. No API keys or accounts required for the core flow.
+
+### 3. Optional: enable Spotify OAuth
+
+Copy `.env.example` to `.env` and fill in `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` from [developer.spotify.com](https://developer.spotify.com/dashboard). Add `http://127.0.0.1:5000/callback` as a Redirect URI in the Spotify app settings.
 
 ---
 
@@ -99,33 +123,55 @@ Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
 | Method | Endpoint | Description |
 |---|---|---|
 | GET | `/` | Web UI |
-| GET | `/auth/spotify` | Initiate Spotify OAuth flow |
-| GET | `/callback` | Spotify OAuth redirect handler |
 | POST | `/api/recognize` | Recognize and classify a single track |
 | POST | `/api/playlist/generate` | Batch classify songs into mood buckets |
-| POST | `/api/playlist/push` | Create a Spotify playlist from a mood bucket |
+| POST | `/api/playlist/save` | Persist a generated playlist to the database |
 | GET | `/api/history` | Retrieve current user's saved playlists |
+| GET | `/api/history/<id>/tracks` | Retrieve all tracks for a saved playlist |
 | GET | `/api/history/stats` | Per-mood playlist and track counts |
+| GET | `/api/auth/spotify` | Optional Spotify OAuth flow |
 | GET | `/api/health` | Health check |
+
+### Example
+
+```bash
+curl -X POST http://127.0.0.1:5000/api/recognize \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Headlines Drake"}'
+```
+
+```json
+{
+  "track": {
+    "name": "Headlines",
+    "artist": "Drake",
+    "genre": "Hip-Hop/Rap",
+    "album_image": "https://...",
+    "preview_url": "https://..."
+  },
+  "audio_features": { "energy": 0.7, "valence": 0.5 },
+  "mood": { "mood": "energetic", "label": "Energetic & Pumped", "confidence": 0.58 }
+}
+```
 
 ---
 
 ## Mood Classification
 
-The classifier scores each track across all four moods using a weighted combination of three signals:
+Each track is scored across all four moods using a weighted combination of three signals, then assigned to the highest-scoring category.
 
-1. **VADER compound score** on the track title (-1 to +1)
-2. **Energy** derived from genre (0 to 1)
-3. **Valence** derived from genre (0 to 1)
+| Signal | Source |
+|---|---|
+| VADER compound score | NLTK sentiment analysis on the track title |
+| Energy | Genre-derived value on a 0 to 1 scale |
+| Valence | Genre-derived value on a 0 to 1 scale |
 
 | Mood | Primary signals |
 |---|---|
-| Happy | High valence, positive VADER score, moderate energy |
-| Sad | Negative VADER score, low valence, low energy |
+| Happy | High valence, positive sentiment, moderate energy |
+| Sad | Negative sentiment, low valence, low energy |
 | Energetic | High energy, positive or neutral sentiment |
 | Chill | Low energy, neutral sentiment, mid valence |
-
-Each track is assigned to the highest-scoring mood with a confidence percentage.
 
 ---
 
