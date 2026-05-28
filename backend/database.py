@@ -84,6 +84,15 @@ def get_user_by_spotify_id(spotify_id: str) -> dict | None:
         return dict(row) if row else None
 
 
+def get_or_create_local_user() -> int:
+    """Return the id of the default local user, creating it if necessary."""
+    return upsert_user(
+        spotify_id="local_default",
+        email="",
+        display_name="Local User",
+    )
+
+
 # ── Playlists ──────────────────────────────────────────────────────────────────
 
 def save_playlist(

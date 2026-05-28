@@ -184,21 +184,21 @@ function renderMoodBoards(playlists) {
   }
 }
 
-// ── Push to Spotify ────────────────────────────────────────────────────────
+// ── Save Playlist Locally ──────────────────────────────────────────────────
 
-async function pushToSpotify() {
+async function savePlaylist() {
   const mood     = document.getElementById('push-mood').value;
   const resultEl = document.getElementById('push-result');
-  const btn      = document.querySelector('.push-area .btn-spotify');
+  const btn      = document.querySelector('.push-area .btn-primary');
 
   if (!lastBatchResult || !(lastBatchResult[mood] || []).length) {
-    showResult(resultEl, `No tracks in the "${mood}" playlist to push.`, true);
+    showResult(resultEl, `No tracks in the "${mood}" playlist to save.`, true);
     return;
   }
 
   setLoading(btn, true);
   try {
-    const res  = await fetch('/api/playlist/push', {
+    const res  = await fetch('/api/playlist/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tracks: lastBatchResult[mood], mood }),
@@ -208,9 +208,8 @@ async function pushToSpotify() {
     if (data.error) { showResult(resultEl, `Error: ${data.error}`, true); return; }
 
     showResult(resultEl, `
-      <strong>Playlist created:</strong> ${data.name}<br/>
-      ${data.tracks_added} tracks added.<br/>
-      <a href="${data.playlist_url}" target="_blank" rel="noopener" style="color:var(--green)">Open in Spotify</a>
+      <strong>Playlist saved:</strong> ${data.name}<br/>
+      ${data.tracks_added} tracks saved to your history.
     `);
     loadHistory();
   } catch (err) {
@@ -266,7 +265,7 @@ async function loadHistory() {
           </div>
         </div>
         <div class="history-item-right">
-          ${p.spotify_url ? `<a href="${p.spotify_url}" target="_blank" rel="noopener" class="btn btn-spotify btn-sm">Open</a>` : ''}
+          <span class="mood-count">#${p.id}</span>
         </div>
       </div>`).join('')}
     </div>`;

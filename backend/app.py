@@ -19,8 +19,12 @@ app.secret_key = FLASK_SECRET_KEY
 spotify_client = SpotifyClient()
 playlist_manager = PlaylistManager()
 
-# Initialise DB tables on startup
 db.init_db()
+
+
+def current_user_id() -> int:
+    """Return the active user's DB id: Spotify-linked if logged in, otherwise local."""
+    return session.get("user_db_id") or db.get_or_create_local_user()
 
 
 # ── Frontend ───────────────────────────────────────────────────────────────────
@@ -30,7 +34,7 @@ def index():
     return render_template("index.html", authenticated=bool(session.get("spotify_token")))
 
 
-# ── Spotify OAuth ──────────────────────────────────────────────────────────────
+# ── Spotify OAuth (optional, only needed if/when Spotify push is enabled) ─────
 
 @app.route("/auth/spotify")
 def spotify_auth():
@@ -48,7 +52,6 @@ def spotify_callback():
     session["spotify_token"] = tokens["access_token"]
     session["spotify_refresh_token"] = tokens.get("refresh_token")
 
-    # Persist user to DB
     try:
         user_info = spotify_client.get_current_user()
         user_db_id = db.upsert_user(
@@ -70,7 +73,7 @@ def logout():
     return redirect("/")
 
 
-# ── API: Song Recognition ──────────────────────────────────────────────────────
+# ── API: Recognition + Generation ──────────────────────────────────────────────
 
 @app.route("/api/recognize", methods=["POST"])
 def recognize():
@@ -84,8 +87,6 @@ def recognize():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-# ── API: Mood Playlist Generation ─────────────────────────────────────────────
 
 @app.route("/api/playlist/generate", methods=["POST"])
 def generate_playlist():
@@ -104,35 +105,37 @@ def generate_playlist():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/playlist/push", methods=["POST"])
-def push_playlist():
-    if not session.get("spotify_token"):
-        return jsonify({"error": "Not authenticated with Spotify. Visit /auth/spotify first."}), 401
+# ── API: Save Playlist Locally ─────────────────────────────────────────────────
 
+@app.route("/api/playlist/save", methods=["POST"])
+def save_playlist_local():
+    """
+    Save a generated mood playlist to the local database.
+    Works without any Spotify authentication.
+    """
     body = request.get_json(silent=True) or {}
     tracks = body.get("tracks", [])
-    mood = body.get("mood", "happy")
+    mood   = body.get("mood", "happy")
 
     if not tracks:
         return jsonify({"error": "tracks list is required"}), 400
 
     try:
-        result = playlist_manager.push_mood_playlist_to_spotify(tracks, mood)
-
-        # Persist playlist + tracks to DB
-        user_db_id = session.get("user_db_id")
-        if user_db_id:
-            playlist_id = db.save_playlist(
-                user_id=user_db_id,
-                playlist_name=result["name"],
-                mood_category=mood,
-                track_count=result["tracks_added"],
-                spotify_uri=result.get("playlist_id", ""),
-                spotify_url=result.get("playlist_url", ""),
-            )
-            db.save_tracks(playlist_id, tracks)
-
-        return jsonify(result)
+        from backend.playlist_manager import MOOD_PLAYLIST_NAMES
+        user_id = current_user_id()
+        playlist_id = db.save_playlist(
+            user_id=user_id,
+            playlist_name=MOOD_PLAYLIST_NAMES.get(mood, f"Phoenix {mood.capitalize()}"),
+            mood_category=mood,
+            track_count=len(tracks),
+        )
+        db.save_tracks(playlist_id, tracks)
+        return jsonify({
+            "playlist_id":  playlist_id,
+            "name":         MOOD_PLAYLIST_NAMES.get(mood, f"Phoenix {mood.capitalize()}"),
+            "tracks_added": len(tracks),
+            "mood":         mood,
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -141,31 +144,21 @@ def push_playlist():
 
 @app.route("/api/history", methods=["GET"])
 def get_history():
-    """Return the authenticated user's past playlists."""
-    user_db_id = session.get("user_db_id")
-    if not user_db_id:
-        return jsonify({"error": "Not authenticated"}), 401
-    playlists = db.get_user_playlists(user_db_id)
+    user_id = current_user_id()
+    playlists = db.get_user_playlists(user_id)
     return jsonify({"playlists": playlists})
 
 
 @app.route("/api/history/<int:playlist_id>/tracks", methods=["GET"])
 def get_history_tracks(playlist_id: int):
-    """Return tracks for a specific saved playlist."""
-    user_db_id = session.get("user_db_id")
-    if not user_db_id:
-        return jsonify({"error": "Not authenticated"}), 401
     tracks = db.get_playlist_tracks(playlist_id)
     return jsonify({"tracks": tracks})
 
 
 @app.route("/api/history/stats", methods=["GET"])
 def get_mood_stats():
-    """Return per-mood playlist/track counts for the current user."""
-    user_db_id = session.get("user_db_id")
-    if not user_db_id:
-        return jsonify({"error": "Not authenticated"}), 401
-    stats = db.get_mood_stats(user_db_id)
+    user_id = current_user_id()
+    stats = db.get_mood_stats(user_id)
     return jsonify({"stats": stats})
 
 
@@ -174,8 +167,6 @@ def get_mood_stats():
 @app.route("/api/health")
 def health():
     return jsonify({"status": "ok", "authenticated": bool(session.get("spotify_token"))})
-
-
 
 
 if __name__ == "__main__":
