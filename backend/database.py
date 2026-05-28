@@ -120,20 +120,19 @@ def save_tracks(playlist_id: int, tracks: list[dict]):
     """Bulk-insert track records linked to a playlist."""
     rows = []
     for t in tracks:
-        shazam = t.get("shazam") or {}
-        spotify = t.get("spotify") or {}
-        mood = t.get("mood") or {}
-        af = t.get("audio_features") or {}
+        track = t.get("track") or {}
+        mood  = t.get("mood") or {}
+        af    = t.get("audio_features") or {}
         rows.append((
             playlist_id,
-            shazam.get("title") or spotify.get("name", "Unknown"),
-            shazam.get("artist") or spotify.get("artist", ""),
-            spotify.get("uri", ""),
+            track.get("name", "Unknown"),
+            track.get("artist", ""),
+            track.get("uri", ""),
             mood.get("compound_score", 0.0),
             af.get("energy", 0.0),
             af.get("valence", 0.0),
-            shazam.get("genre", ""),
-            spotify.get("album_image", ""),
+            "",
+            track.get("album_image", ""),
         ))
     with get_connection() as conn:
         conn.executemany(
