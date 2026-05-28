@@ -256,22 +256,75 @@ async function loadHistory() {
     }
 
     listEl.innerHTML = `<div class="history-list">${playlists.map(p => `
-      <div class="history-item">
-        <div class="history-item-left">
-          <span class="mood-tag ${moodClass(p.mood_category)}">${moodEmoji(p.mood_category)} ${p.mood_category}</span>
-          <div>
-            <div class="history-item-name">${p.playlist_name}</div>
-            <div class="history-item-meta">${p.track_count} tracks &nbsp;·&nbsp; ${formatDate(p.created_at)}</div>
+      <div class="history-item-wrapper">
+        <div class="history-item" onclick="toggleHistoryTracks(${p.id}, this)">
+          <div class="history-item-left">
+            <span class="mood-tag ${moodClass(p.mood_category)}">${moodEmoji(p.mood_category)} ${p.mood_category}</span>
+            <div>
+              <div class="history-item-name">${p.playlist_name}</div>
+              <div class="history-item-meta">${p.track_count} tracks &nbsp;·&nbsp; ${formatDate(p.created_at)}</div>
+            </div>
+          </div>
+          <div class="history-item-right">
+            <span class="chevron">▾</span>
           </div>
         </div>
-        <div class="history-item-right">
-          <span class="mood-count">#${p.id}</span>
-        </div>
+        <div class="history-tracks hidden" id="history-tracks-${p.id}"></div>
       </div>`).join('')}
     </div>`;
   } catch (err) {
     listEl.innerHTML = `<p class="hint" style="color:#f43f5e">Failed to load history: ${err.message}</p>`;
   }
+}
+
+// ── History track expansion ────────────────────────────────────────────────
+
+async function toggleHistoryTracks(playlistId, headerEl) {
+  const wrapper = headerEl.parentElement;
+  const tracksEl = document.getElementById(`history-tracks-${playlistId}`);
+  const chevron = headerEl.querySelector('.chevron');
+
+  if (!tracksEl.classList.contains('hidden')) {
+    tracksEl.classList.add('hidden');
+    chevron.textContent = '▾';
+    return;
+  }
+
+  if (!tracksEl.dataset.loaded) {
+    tracksEl.innerHTML = '<p class="hint" style="padding:.5rem 1rem">Loading...</p>';
+    try {
+      const res  = await fetch(`/api/history/${playlistId}/tracks`);
+      const data = await res.json();
+      const tracks = data.tracks || [];
+      if (!tracks.length) {
+        tracksEl.innerHTML = '<p class="hint" style="padding:.5rem 1rem">No tracks.</p>';
+      } else {
+        tracksEl.innerHTML = tracks.map(t => `
+          <div class="history-track-row">
+            ${t.album_image_url
+              ? `<img src="${t.album_image_url}" alt="" loading="lazy" />`
+              : `<div class="track-thumb-placeholder"></div>`}
+            <div class="history-track-info">
+              <div class="history-track-title">${t.track_name}</div>
+              <div class="history-track-meta">
+                ${t.artist || ''}${t.genre ? ' &middot; ' + t.genre : ''}
+              </div>
+            </div>
+            <div class="history-track-stats">
+              <span title="VADER compound">${t.mood_score >= 0 ? '+' : ''}${Number(t.mood_score).toFixed(2)}</span>
+              <span title="Energy">E ${Math.round((t.energy || 0) * 100)}</span>
+              <span title="Valence">V ${Math.round((t.valence || 0) * 100)}</span>
+            </div>
+          </div>`).join('');
+      }
+      tracksEl.dataset.loaded = '1';
+    } catch (err) {
+      tracksEl.innerHTML = `<p class="hint" style="color:#f43f5e;padding:.5rem 1rem">Failed to load: ${err.message}</p>`;
+    }
+  }
+
+  tracksEl.classList.remove('hidden');
+  chevron.textContent = '▴';
 }
 
 // ── Enter key support ──────────────────────────────────────────────────────
