@@ -58,22 +58,20 @@ def init_db():
 # ── Users ──────────────────────────────────────────────────────────────────────
 
 def upsert_user(spotify_id: str, email: str = "", display_name: str = "") -> int:
-    """Insert or update a user, return their internal DB id."""
+    """Insert or update a user, return their internal DB id. Race-safe."""
     with get_connection() as conn:
-        existing = conn.execute(
-            "SELECT id FROM users WHERE spotify_id = ?", (spotify_id,)
-        ).fetchone()
-        if existing:
-            conn.execute(
-                "UPDATE users SET email = ?, display_name = ? WHERE spotify_id = ?",
-                (email, display_name, spotify_id),
-            )
-            return existing["id"]
-        cur = conn.execute(
-            "INSERT INTO users (spotify_id, email, display_name) VALUES (?, ?, ?)",
+        conn.execute(
+            """INSERT INTO users (spotify_id, email, display_name)
+               VALUES (?, ?, ?)
+               ON CONFLICT(spotify_id) DO UPDATE SET
+                 email        = excluded.email,
+                 display_name = excluded.display_name""",
             (spotify_id, email, display_name),
         )
-        return cur.lastrowid
+        row = conn.execute(
+            "SELECT id FROM users WHERE spotify_id = ?", (spotify_id,)
+        ).fetchone()
+        return row["id"]
 
 
 def get_user_by_spotify_id(spotify_id: str) -> dict | None:
