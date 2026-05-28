@@ -76,12 +76,29 @@
       {% endif %}
       <div id="push-result" class="result-box hidden mt-sm"></div>
     </section>
+
+    <!-- Playlist History (only shown when authenticated) -->
+    {% if authenticated %}
+    <section class="card" id="history-section">
+      <div class="history-header">
+        <h2>🗂️ Your Playlist History</h2>
+        <button class="btn btn-outline" onclick="loadHistory()">Refresh</button>
+      </div>
+      <div id="stats-row" class="stats-row hidden"></div>
+      <div id="history-list">
+        <p class="hint">Loading your saved playlists…</p>
+      </div>
+    </section>
+    {% endif %}
   </main>
 
   <footer>
-    <p>Built with Flask &middot; Shazam API &middot; Spotify API &middot; VADER NLP &nbsp;|&nbsp; PhoenixPlaylist &copy; 2025</p>
+    <p>Built with Flask &middot; SQLite &middot; Shazam API &middot; Spotify API &middot; VADER NLP &nbsp;|&nbsp; PhoenixPlaylist &copy; 2025</p>
   </footer>
 
   <script src="/static/js/app.js"></script>
+  {% if authenticated %}
+  <script>loadHistory();</script>
+  {% endif %}
 </body>
 </html>
