@@ -1,6 +1,13 @@
-# Environment
+# Local configuration
 .env
 *.env
+!.env.example
+
+# Local databases and generated data
+*.db
+*.sqlite
+*.sqlite3
+uploads/
 
 # Python
 __pycache__/
@@ -12,14 +19,17 @@ build/
 venv/
 env/
 
+# Tests and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
 # NLTK data
 nltk_data/
 
-# IDE
+# Editors and operating systems
 .vscode/
 .idea/
 *.swp
-
-# OS
 .DS_Store
 Thumbs.db
