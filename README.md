@@ -99,7 +99,20 @@ curl -X POST http://127.0.0.1:5000/api/recognize \
 - iTunes returns the top matching result; ambiguous song searches can select the wrong recording.
 - Title sentiment and genre proxies are approximate and do not analyze the audio itself.
 - The local user and database setup are for personal use. Authentication and access controls need more work before hosting for multiple users.
-- The app has no automated test suite yet, and the optional Spotify export workflow depends on Spotify permissions and API availability.
+- Automated tests cover the Flask API, SQLite persistence, mood estimates, and deterministic iTunes response handling. Live external API availability is not guaranteed, and optional Spotify export depends on Spotify permissions.
+
+## Tests
+
+After installing the dependencies, install pytest and prepare the VADER lexicon:
+
+```bash
+python -m pip install pytest
+python -c "import nltk; nltk.download('vader_lexicon')"
+python -m pytest -q
+python scripts/smoke_test.py
+```
+
+The test suite uses mocked iTunes responses so it does not require live network access. The smoke test starts the actual Flask process and checks the health endpoint and homepage. GitHub Actions runs both checks on pushes and pull requests.
 
 ## Next steps
 
