@@ -2,7 +2,22 @@
 
 let lastBatchResult = null;
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// Helpers
+
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
+function safeURL(value) {
+  try {
+    const url = new URL(String(value || ''));
+    return url.protocol === 'https:' || url.protocol === 'http:' ? escapeHTML(url.href) : '';
+  } catch {
+    return '';
+  }
+}
 
 function setLoading(btnEl, loading) {
   if (loading) {
@@ -35,16 +50,16 @@ function formatDate(iso) {
 
 function trackItemHTML(result) {
   const t = result.track || {};
-  const img = t.album_image || '';
+  const img = safeURL(t.album_image);
   const imgTag = img
-    ? `<img src="${img}" alt="${t.name}" loading="lazy" />`
+    ? `<img src="${img}" alt="${escapeHTML(t.name)}" loading="lazy" />`
     : `<div style="width:36px;height:36px;background:#2e2e3d;border-radius:4px;flex-shrink:0"></div>`;
   return `
     <div class="track-item">
       ${imgTag}
       <div class="track-item-info">
-        <div class="track-item-title">${t.name || 'Unknown'}</div>
-        <div class="track-item-artist">${t.artist || ''}</div>
+        <div class="track-item-title">${escapeHTML(t.name || 'Unknown')}</div>
+        <div class="track-item-artist">${escapeHTML(t.artist || '')}</div>
       </div>
     </div>`;
 }
@@ -68,18 +83,21 @@ async function recognizeTrack() {
     });
     const data = await res.json();
 
-    if (data.error) { showResult(resultEl, `Error: ${data.error}`, true); return; }
+    if (data.error) { showResult(resultEl, `Error: ${escapeHTML(data.error)}`, true); return; }
 
     const t    = data.track || {};
     const mood = data.mood  || {};
     const af   = data.audio_features || {};
 
-    const imgTag = t.album_image
-      ? `<img src="${t.album_image}" alt="${t.name}" style="width:72px;height:72px;border-radius:8px;object-fit:cover;flex-shrink:0" />`
+    const artworkURL = safeURL(t.album_image);
+    const previewURL = safeURL(t.preview_url);
+    const externalURL = safeURL(t.external_url);
+    const imgTag = artworkURL
+      ? `<img src="${artworkURL}" alt="${escapeHTML(t.name)}" style="width:72px;height:72px;border-radius:8px;object-fit:cover;flex-shrink:0" />`
       : '';
 
-    const previewBtn = t.preview_url
-      ? `<button class="btn btn-outline btn-sm" style="margin-top:.5rem" onclick="togglePreview('${t.preview_url}', this)">Play Preview</button>`
+    const previewBtn = previewURL
+      ? `<button class="btn btn-outline btn-sm" style="margin-top:.5rem" data-preview-url="${previewURL}" onclick="togglePreview(this.dataset.previewUrl, this)">Play Preview</button>`
       : '';
 
     const energy  = af.energy  != null ? `${Math.round(af.energy  * 100)}%` : 'N/A';
@@ -90,18 +108,18 @@ async function recognizeTrack() {
       <div class="track-card">
         ${imgTag}
         <div class="track-info">
-          <h3>${t.name || query}</h3>
-          <p>${t.artist || ''}${t.album ? ' &mdash; ' + t.album : ''}</p>
-          <p style="font-size:.8rem;color:var(--muted)">Genre: ${t.genre || 'Unknown'} &nbsp;|&nbsp; Energy: ${energy} &nbsp;|&nbsp; Positivity: ${valence}</p>
-          <span class="mood-tag ${moodClass(mood.mood)}">${moodEmoji(mood.mood)} ${mood.label || mood.mood}</span>
+          <h3>${escapeHTML(t.name || query)}</h3>
+          <p>${escapeHTML(t.artist || '')}${t.album ? ' &mdash; ' + escapeHTML(t.album) : ''}</p>
+          <p style="font-size:.8rem;color:var(--muted)">Genre: ${escapeHTML(t.genre || 'Unknown')} &nbsp;|&nbsp; Energy: ${energy} &nbsp;|&nbsp; Positivity: ${valence}</p>
+          <span class="mood-tag ${moodClass(mood.mood)}">${moodEmoji(mood.mood)} ${escapeHTML(mood.label || mood.mood)}</span>
           <span style="font-size:.78rem;color:var(--muted);margin-left:.5rem">Confidence: ${Math.round((mood.confidence || 0) * 100)}%</span>
           ${previewBtn}
-          ${t.external_url ? `<br><a href="${t.external_url}" target="_blank" rel="noopener" style="font-size:.82rem;color:var(--accent);margin-top:.4rem;display:inline-block">Open in iTunes</a>` : ''}
+          ${externalURL ? `<br><a href="${externalURL}" target="_blank" rel="noopener" style="font-size:.82rem;color:var(--accent);margin-top:.4rem;display:inline-block">Open in iTunes</a>` : ''}
         </div>
       </div>
     `);
   } catch (err) {
-    showResult(resultEl, `Network error: ${err.message}`, true);
+    showResult(resultEl, `Network error: ${escapeHTML(err.message)}`, true);
   } finally {
     setLoading(btn, false);
   }
@@ -146,13 +164,13 @@ async function generatePlaylist() {
     });
     const data = await res.json();
 
-    if (data.error) { showResult(resultEl, `Error: ${data.error}`, true); return; }
+    if (data.error) { showResult(resultEl, `Error: ${escapeHTML(data.error)}`, true); return; }
 
     lastBatchResult = data.playlists;
     renderMoodBoards(data.playlists);
     boardsEl.classList.remove('hidden');
   } catch (err) {
-    showResult(resultEl, `Network error: ${err.message}`, true);
+    showResult(resultEl, `Network error: ${escapeHTML(err.message)}`, true);
   } finally {
     setLoading(btn, false);
   }
@@ -205,15 +223,15 @@ async function savePlaylist() {
     });
     const data = await res.json();
 
-    if (data.error) { showResult(resultEl, `Error: ${data.error}`, true); return; }
+    if (data.error) { showResult(resultEl, `Error: ${escapeHTML(data.error)}`, true); return; }
 
     showResult(resultEl, `
-      <strong>Playlist saved:</strong> ${data.name}<br/>
+      <strong>Playlist saved:</strong> ${escapeHTML(data.name)}<br/>
       ${data.tracks_added} tracks saved to your history.
     `);
     loadHistory();
   } catch (err) {
-    showResult(resultEl, `Network error: ${err.message}`, true);
+    showResult(resultEl, `Network error: ${escapeHTML(err.message)}`, true);
   } finally {
     setLoading(btn, false);
   }
@@ -251,7 +269,7 @@ async function loadHistory() {
 
     const playlists = histData.playlists || [];
     if (!playlists.length) {
-      listEl.innerHTML = '<p class="hint">No playlists saved yet. Generate and push one above.</p>';
+      listEl.innerHTML = '<p class="hint">No playlists saved yet. Generate and save one above.</p>';
       return;
     }
 
@@ -261,7 +279,7 @@ async function loadHistory() {
           <div class="history-item-left">
             <span class="mood-tag ${moodClass(p.mood_category)}">${moodEmoji(p.mood_category)} ${p.mood_category}</span>
             <div>
-              <div class="history-item-name">${p.playlist_name}</div>
+              <div class="history-item-name">${escapeHTML(p.playlist_name)}</div>
               <div class="history-item-meta">${p.track_count} tracks &nbsp;·&nbsp; ${formatDate(p.created_at)}</div>
             </div>
           </div>
@@ -273,7 +291,7 @@ async function loadHistory() {
       </div>`).join('')}
     </div>`;
   } catch (err) {
-    listEl.innerHTML = `<p class="hint" style="color:#f43f5e">Failed to load history: ${err.message}</p>`;
+    listEl.innerHTML = `<p class="hint" style="color:#f43f5e">Failed to load history: ${escapeHTML(err.message)}</p>`;
   }
 }
 
@@ -301,13 +319,13 @@ async function toggleHistoryTracks(playlistId, headerEl) {
       } else {
         tracksEl.innerHTML = tracks.map(t => `
           <div class="history-track-row">
-            ${t.album_image_url
-              ? `<img src="${t.album_image_url}" alt="" loading="lazy" />`
+            ${safeURL(t.album_image_url)
+              ? `<img src="${safeURL(t.album_image_url)}" alt="" loading="lazy" />`
               : `<div class="track-thumb-placeholder"></div>`}
             <div class="history-track-info">
-              <div class="history-track-title">${t.track_name}</div>
+              <div class="history-track-title">${escapeHTML(t.track_name)}</div>
               <div class="history-track-meta">
-                ${t.artist || ''}${t.genre ? ' &middot; ' + t.genre : ''}
+                ${escapeHTML(t.artist || '')}${t.genre ? ' &middot; ' + escapeHTML(t.genre) : ''}
               </div>
             </div>
             <div class="history-track-stats">
@@ -319,7 +337,7 @@ async function toggleHistoryTracks(playlistId, headerEl) {
       }
       tracksEl.dataset.loaded = '1';
     } catch (err) {
-      tracksEl.innerHTML = `<p class="hint" style="color:#f43f5e;padding:.5rem 1rem">Failed to load: ${err.message}</p>`;
+      tracksEl.innerHTML = `<p class="hint" style="color:#f43f5e;padding:.5rem 1rem">Failed to load: ${escapeHTML(err.message)}</p>`;
     }
   }
 
